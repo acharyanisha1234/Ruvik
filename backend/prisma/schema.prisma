@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+enum Role {
+  DRIVER
+  PROVIDER
+  OWNER
+  ADMIN
+}
+
+enum VehicleType {
+  BIKE
+  CAR
+  SUV
+  TRUCK
+  BUS
+  VAN
+}
+
+enum BreakdownStatus {
+  PENDING
+  MATCHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ProviderStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum RentalStatus {
+  AVAILABLE
+  RENTED
+  MAINTENANCE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+// ==================== MODELS ====================
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String   @unique
+  password     String
+  role         Role     @default(DRIVER)
+  avatarUrl    String?
+  isVerified   Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  fcmToken     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vehicles     Vehicle[]
+  breakdowns   BreakdownRequest[] @relation("UserBreakdowns")
+  providerJobs BreakdownRequest[] @relation("ProviderJobs")
+  provider     Provider?
+  rentals      Rental[]
+  payments     Payment[]
+}
+
+model Vehicle {
+  id           String      @id @default(cuid())
+  userId       String
+  type         VehicleType
+  brand        String
+  model        String
+  year         Int
+  plateNumber  String      @unique
+  color        String?
+  imageUrl     String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  breakdowns   BreakdownRequest[]
+  rentals      Rental[]
+}
+
+model Provider {
+  id            String          @id @default(cuid())
+  userId        String          @unique
+  businessName  String
+  services      String[]
+  latitude      Float
+  longitude     Float
+  address       String
+  rating        Float           @default(0)
+  totalReviews  Int             @default(0)
+  status        ProviderStatus  @default(PENDING)
+  isAvailable   Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs          BreakdownRequest[]
+}
+
+model BreakdownRequest {
+  id            String           @id @default(cuid())
+  userId        String
+  vehicleId     String
+  providerId    String?
+  issue         String
+  description   String?
+  latitude      Float
+  longitude     Float
+  address       String
+  status        BreakdownStatus  @default(PENDING)
+  imageUrl      String?
+  estimatedCost Float?
+  finalCost     Float?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  completedAt   DateTime?
+
+  user          User             @relation("UserBreakdowns", fields: [userId], references: [id])
+  vehicle       Vehicle          @relation(fields: [vehicleId], references: [id])
+  provider      Provider?        @relation("ProviderJobs", fields: [providerId], references: [id])
+  payment       Payment?
+}
+
+model Rental {
+  id            String       @id @default(cuid())
+  ownerId       String
+  vehicleId     String
+  title         String
+  description   String?
+  pricePerDay   Float
+  latitude      Float
+  longitude     Float
+  address       String
+  status        RentalStatus @default(AVAILABLE)
+  images        String[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  owner         User         @relation(fields: [ownerId], references: [id])
+  vehicle       Vehicle      @relation(fields: [vehicleId], references: [id])
+}
+
+model Payment {
+  id            String         @id @default(cuid())
+  userId        String
+  breakdownId   String?        @unique
+  amount        Float
+  currency      String         @default("NPR")
+  method        String
+  status        PaymentStatus  @default(PENDING)
+  transactionId String?        @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id])
+  breakdown     BreakdownRequest? @relation(fields: [breakdownId], references: [id])
+}
