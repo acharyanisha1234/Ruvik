@@ -7,166 +7,125 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ==================== ENUMS ====================
-enum Role {
+enum UserRole {
   DRIVER
   PROVIDER
   OWNER
   ADMIN
 }
 
-enum VehicleType {
-  BIKE
-  CAR
-  SUV
-  TRUCK
-  BUS
-  VAN
+enum ServiceCategory {
+  MECHANIC
+  TOWING
+  FUEL
+  TYRE
+  BATTERY
+  LOCKSMITH
 }
 
-enum BreakdownStatus {
-  PENDING
-  MATCHED
-  IN_PROGRESS
+enum RequestStatus {
+  REQUESTED
+  ACCEPTED
+  ON_THE_WAY
+  ARRIVED
   COMPLETED
   CANCELLED
 }
 
-enum ProviderStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  SUSPENDED
-}
-
-enum RentalStatus {
-  AVAILABLE
-  RENTED
-  MAINTENANCE
-}
-
-enum PaymentStatus {
-  PENDING
-  SUCCESS
-  FAILED
-  REFUNDED
-}
-
-// ==================== MODELS ====================
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  phone        String   @unique
-  password     String
-  role         Role     @default(DRIVER)
-  avatarUrl    String?
-  isVerified   Boolean  @default(false)
-  isActive     Boolean  @default(true)
-  fcmToken     String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String        @id @default(cuid())
+  phone         String        @unique
+  email         String?       @unique
+  name          String
+  passwordHash  String
+  role          UserRole      @default(DRIVER)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  vehicles     Vehicle[]
-  breakdowns   BreakdownRequest[] @relation("UserBreakdowns")
-  providerJobs BreakdownRequest[] @relation("ProviderJobs")
-  provider     Provider?
-  rentals      Rental[]
-  payments     Payment[]
+  vehicles      Vehicle[]
+  breakdownRequests BreakdownRequest[]
+  providerProfile   ServiceProvider?
+  rentalsAsRenter   Rental[]         @relation("RenterRentals")
+  rentalsAsDriver   Rental[]         @relation("DriverRentals")
 }
 
 model Vehicle {
-  id           String      @id @default(cuid())
-  userId       String
-  type         VehicleType
-  brand        String
-  model        String
-  year         Int
-  plateNumber  String      @unique
-  color        String?
-  imageUrl     String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id                String    @id @default(cuid())
+  ownerId           String
+  owner             User      @relation(fields: [ownerId], references: [id])
+  make              String
+  model             String
+  year              Int
+  fuelType          String
+  registrationNumber String   @unique
+  photos            String[]
+  createdAt         DateTime  @default(now())
 
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  breakdowns   BreakdownRequest[]
-  rentals      Rental[]
+  breakdownRequests BreakdownRequest[]
+  rentals           Rental[]
 }
 
-model Provider {
-  id            String          @id @default(cuid())
-  userId        String          @unique
-  businessName  String
-  services      String[]
-  latitude      Float
-  longitude     Float
-  address       String
-  rating        Float           @default(0)
-  totalReviews  Int             @default(0)
-  status        ProviderStatus  @default(PENDING)
-  isAvailable   Boolean         @default(true)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+model ServiceProvider {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id])
+  businessName      String
+  serviceCategories ServiceCategory[]
+  serviceRadiusKm   Float     @default(10)
+  latitude          Float
+  longitude         Float
+  isVerified        Boolean   @default(false)
+  isAvailable       Boolean   @default(true)
+  reliabilityScore  Float     @default(0)
+  totalRequests     Int       @default(0)
+  acceptedRequests  Int       @default(0)
+  completedRequests Int       @default(0)
+  createdAt         DateTime  @default(now())
 
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobs          BreakdownRequest[]
+  serviceRequests ServiceRequest[]
 }
 
 model BreakdownRequest {
-  id            String           @id @default(cuid())
-  userId        String
-  vehicleId     String
-  providerId    String?
-  issue         String
-  description   String?
-  latitude      Float
-  longitude     Float
-  address       String
-  status        BreakdownStatus  @default(PENDING)
-  imageUrl      String?
-  estimatedCost Float?
-  finalCost     Float?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  completedAt   DateTime?
+  id          String        @id @default(cuid())
+  driverId    String
+  driver      User          @relation(fields: [driverId], references: [id])
+  vehicleId   String
+  vehicle     Vehicle       @relation(fields: [vehicleId], references: [id])
+  problemType String
+  description String?
+  latitude    Float
+  longitude   Float
+  status      RequestStatus @default(REQUESTED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  user          User             @relation("UserBreakdowns", fields: [userId], references: [id])
-  vehicle       Vehicle          @relation(fields: [vehicleId], references: [id])
-  provider      Provider?        @relation("ProviderJobs", fields: [providerId], references: [id])
-  payment       Payment?
+  serviceRequests ServiceRequest[]
+}
+
+model ServiceRequest {
+  id                 String        @id @default(cuid())
+  breakdownRequestId String
+  breakdownRequest   BreakdownRequest @relation(fields: [breakdownRequestId], references: [id])
+  providerId         String
+  provider           ServiceProvider @relation(fields: [providerId], references: [id])
+  status             RequestStatus @default(REQUESTED)
+  etaMinutes         Int?
+  finalCost          Float?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 }
 
 model Rental {
-  id            String       @id @default(cuid())
-  ownerId       String
-  vehicleId     String
-  title         String
-  description   String?
-  pricePerDay   Float
-  latitude      Float
-  longitude     Float
-  address       String
-  status        RentalStatus @default(AVAILABLE)
-  images        String[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-
-  owner         User         @relation(fields: [ownerId], references: [id])
-  vehicle       Vehicle      @relation(fields: [vehicleId], references: [id])
-}
-
-model Payment {
-  id            String         @id @default(cuid())
-  userId        String
-  breakdownId   String?        @unique
-  amount        Float
-  currency      String         @default("NPR")
-  method        String
-  status        PaymentStatus  @default(PENDING)
-  transactionId String?        @unique
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-
-  user          User           @relation(fields: [userId], references: [id])
-  breakdown     BreakdownRequest? @relation(fields: [breakdownId], references: [id])
+  id          String    @id @default(cuid())
+  vehicleId   String
+  vehicle     Vehicle   @relation(fields: [vehicleId], references: [id])
+  renterId    String
+  renter      User      @relation("RenterRentals", fields: [renterId], references: [id])
+  driverId    String?
+  driver      User?     @relation("DriverRentals", fields: [driverId], references: [id])
+  startDate   DateTime
+  endDate     DateTime
+  totalAmount Float
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
 }
