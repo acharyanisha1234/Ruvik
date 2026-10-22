@@ -1,0 +1,1 @@
+ const earthRadiusKm = 6371;
