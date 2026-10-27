@@ -6,7 +6,6 @@ import { findMatchingProviders } from '../services/matching.service';
 import { getIO } from '../socket';
 
 const prisma = new PrismaClient();
-
 const PROBLEM_TO_CATEGORY: Record<string, ServiceCategory> = {
   ENGINE: 'MECHANIC',
   OVERHEATING: 'MECHANIC',
