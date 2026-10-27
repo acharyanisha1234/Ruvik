@@ -39,7 +39,6 @@ export async function getVehicle(req: AuthRequest, res: Response) {
   if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
   res.json(vehicle);
 }
-
 export async function deleteVehicle(req: AuthRequest, res: Response) {
   const result = await prisma.vehicle.deleteMany({
     where: { id: req.params.id, ownerId: req.userId },
